@@ -5,7 +5,51 @@ from .. import RPCBatchProtocol, RPCRequest, RPCResponse, RPCErrorResponse,\
                InvalidRequestError, MethodNotFoundError, ServerError,\
                InvalidReplyError, RPCError, RPCBatchRequest, RPCBatchResponse
 
-import json, datetime
+import re, json, dateutil.parser, datetime
+
+
+class DatetimeEncoder(json.JSONEncoder):
+
+    def default(self, obj):
+        if hasattr(obj, 'isoformat'):
+            return obj.isoformat()
+        else:
+            return json.JSONEncoder.default(obj)
+
+
+class DatetimeDecoder(object):
+
+    @staticmethod
+    def json_date_parser(dct):
+        for (key, value) in dct.items():
+            if isinstance(value, list):
+                tmp = []
+                for v_ in value:
+                    tmp.append(DatetimeDecoder._parser(v_))
+                dct[key] = tmp
+            elif isinstance(value, dict):
+                tmp = {}
+                for k_, v_ in value.items():
+                    tmp[k_] = DatetimeDecoder._parser(v_)
+                dct[key] = tmp
+            elif isinstance(value, datetime.datetime):
+                dct[key] = value
+            else:
+                dct[key] = DatetimeDecoder._parser(value)
+        return dct
+
+
+    @staticmethod
+    def _parser(value):
+        try:
+            if re.match("(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})\.(\d{3,6})Z", value):
+                return dateutil.parser.parse(value)
+            return value
+        except:
+            return value
+
+
+
 
 class FixedErrorMessageMixin(object):
     def __init__(self, *args, **kwargs):
@@ -62,7 +106,7 @@ class JSONRPCSuccessResponse(RPCResponse):
         }
 
     def serialize(self):
-        return json.dumps(self._to_dict())
+        return json.dumps(self._to_dict(), cls=DatetimeEncoder)
 
 
 class JSONRPCErrorResponse(RPCErrorResponse):
@@ -77,7 +121,7 @@ class JSONRPCErrorResponse(RPCErrorResponse):
         }
 
     def serialize(self):
-        return json.dumps(self._to_dict())
+        return json.dumps(self._to_dict(), cls=DatetimeEncoder)
 
 
 def _get_code_and_message(error):
@@ -142,9 +186,8 @@ class JSONRPCRequest(RPCRequest):
         return jdata
 
     def serialize(self):
-        #: http://stackoverflow.com/questions/455580/json-datetime-between-python-and-javascript/2680060#2680060                    
-        dthandler = lambda obj: obj.isoformat() if isinstance(obj, datetime.datetime) else None
-        return json.dumps(self._to_dict(), default=dthandler)
+        #: http://stackoverflow.com/questions/455580/json-datetime-between-python-and-javascript/2680060#2680060
+        return json.dumps(self._to_dict(), cls=DatetimeEncoder)
 
 
 class JSONRPCBatchRequest(RPCBatchRequest):
@@ -162,12 +205,12 @@ class JSONRPCBatchRequest(RPCBatchRequest):
         return False
 
     def serialize(self):
-        return json.dumps([req._to_dict() for req in self])
+        return json.dumps([req._to_dict() for req in self], cls=DatetimeEncoder)
 
 
 class JSONRPCBatchResponse(RPCBatchResponse):
     def serialize(self):
-        return json.dumps([resp._to_dict() for resp in self if resp != None])
+        return json.dumps([resp._to_dict() for resp in self if resp != None], cls=DatetimeEncoder)
 
 
 class JSONRPCProtocol(RPCBatchProtocol):
@@ -208,7 +251,7 @@ class JSONRPCProtocol(RPCBatchProtocol):
 
     def parse_reply(self, data):
         try:
-            rep = json.loads(data)
+            rep = json.loads(data, object_hook=DatetimeDecoder.json_date_parser)
         except Exception as e:
             raise InvalidReplyError(e)
 
@@ -245,7 +288,7 @@ class JSONRPCProtocol(RPCBatchProtocol):
 
     def parse_request(self, data):
         try:
-            req = json.loads(data)
+            req = json.loads(data, object_hook=DatetimeDecoder.json_date_parser)
         except Exception as e:
             raise JSONRPCParseError()
 
