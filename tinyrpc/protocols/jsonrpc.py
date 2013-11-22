@@ -275,10 +275,10 @@ class JSONRPCProtocol(RPCBatchProtocol):
                 'Reply must contain exactly one of result and error.'
             )
 
-        if(rep['id'] not in JSONRPCProtocol._request_ids):
-            return None
-        else:
-            JSONRPCProtocol._request_ids.remove(rep['id'])
+        # if(rep['id'] not in JSONRPCProtocol._request_ids):
+        #     return None
+        # else:
+        #     JSONRPCProtocol._request_ids.remove(rep['id'])
 
         if 'error' in rep:
             response = JSONRPCErrorResponse()
