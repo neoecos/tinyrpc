@@ -225,6 +225,7 @@ class JSONRPCProtocol(RPCBatchProtocol):
     def __init__(self, *args, **kwargs):
         super(JSONRPCProtocol, self).__init__(*args, **kwargs)
         self._id_counter = 0
+        JSONRPCProtocol._request_ids = set()
 
     def _get_unique_id(self):
         self._id_counter += 1
@@ -257,7 +258,8 @@ class JSONRPCProtocol(RPCBatchProtocol):
 
         for k in rep.iterkeys():
             if not k in self._ALLOWED_REPLY_KEYS:
-                raise InvalidReplyError('Key not allowed: %s' % k)
+                return None
+                #raise InvalidReplyError('Key not allowed: %s' % k)
 
         if not 'jsonrpc' in rep:
             raise InvalidReplyError('Missing jsonrpc (version) in response.')
@@ -272,6 +274,11 @@ class JSONRPCProtocol(RPCBatchProtocol):
             raise InvalidReplyError(
                 'Reply must contain exactly one of result and error.'
             )
+
+        if(rep['id'] not in JSONRPCProtocol._request_ids):
+            return None
+        else:
+            JSONRPCProtocol._request_ids.remove(rep['id'])
 
         if 'error' in rep:
             response = JSONRPCErrorResponse()
@@ -323,7 +330,7 @@ class JSONRPCProtocol(RPCBatchProtocol):
         request = JSONRPCRequest()
         request.method = str(req['method'])
         request.unique_id = req.get('id', None)
-
+        JSONRPCProtocol._request_ids.add(request.unique_id)
         params = req.get('params', None)
         if params != None:
             if isinstance(params, list):

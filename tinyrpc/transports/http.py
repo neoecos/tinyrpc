@@ -54,9 +54,13 @@ class HttpWebSocketClientTransport(ClientTransport):
         if not isinstance(message, str):
             raise TypeError('str expected')
         self.ws.send(message)
-        r = self.ws.recv()
         if expect_reply:
-            return r
+            return self.recv_message()
+
+    def recv_message(self):
+        r = self.ws.recv()
+        return r
+
 
     def close(self):
         if self.ws is not None:

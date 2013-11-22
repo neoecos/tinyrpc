@@ -19,8 +19,13 @@ class RPCClient(object):
     def _send_and_handle_reply(self, req):
         # sends and waits for reply
         reply = self.transport.send_message(req.serialize())
-
         response = self.protocol.parse_reply(reply)
+        if self.transport.__class__.__name__== "HttpWebSocketClientTransport" \
+        and req.unique_id:
+            while not response:
+                response = self.protocol.parse_reply(
+                                    self.transport.recv_message())
+
 
         if hasattr(response, 'error'):
             raise RPCError('Error calling remote procedure: %s' %\
